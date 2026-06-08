@@ -55,16 +55,42 @@ function getWrongAnimals(pool, correct, n) {
 
 // Redact the animal's name from the fun fact text
 function redactAnimalName(factText, animal) {
-  const escaped = animal.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   let result = factText;
-  // "The X's" → "This animal's"
-  result = result.replace(new RegExp('\\bThe ' + escaped + "'s\\b", 'gi'), "This animal's");
-  // "The X" → "This animal"
-  result = result.replace(new RegExp('\\bThe ' + escaped + '\\b', 'gi'), 'This animal');
-  // "X's" → "This animal's"
-  result = result.replace(new RegExp('\\b' + escaped + "'s\\b", 'gi'), "This animal's");
-  // "X" → "this animal"
-  result = result.replace(new RegExp('\\b' + escaped + '\\b', 'gi'), 'this animal');
+
+  // Build all forms to redact: exact name + plural variants
+  const base    = animal.name;
+  const escaped = base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  // Plural forms: try "Wolves" style (drop y→ies), "es" suffix, and simple "s"
+  const plurals = [];
+  if (base.endsWith('y')) {
+    plurals.push(escaped.slice(0, -1) + 'ies'); // butterfly → butterflies
+  }
+  plurals.push(escaped + 'es'); // fox → foxes
+  plurals.push(escaped + 's');  // jaguar → jaguars
+
+  // For multi-word names, also redact just the first word if it's distinctive
+  // e.g. "Snow Leopard" → also catch "snow leopards"
+  const firstWord = base.split(' ')[0];
+  const firstEsc  = firstWord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  if (base.split(' ').length > 1) {
+    plurals.push(firstEsc + 's');
+    plurals.push(firstEsc + 'es');
+  }
+
+  // Apply redactions — longest/most specific first (possessives, then plurals, then base)
+  const allForms = [escaped, ...plurals];
+  for (const form of allForms) {
+    // "The X's" / "the Xs's" → "This animal's"
+    result = result.replace(new RegExp('\\bThe ' + form + "'s\\b", 'gi'), "This animal's");
+    // "The X" → "This animal"
+    result = result.replace(new RegExp('\\bThe ' + form + '\\b', 'gi'), 'This animal');
+    // "X's" → "This animal's"
+    result = result.replace(new RegExp('\\b' + form + "'s\\b", 'gi'), "This animal's");
+    // "X" / "Xs" → "this animal"
+    result = result.replace(new RegExp('\\b' + form + '\\b', 'gi'), 'this animal');
+  }
+
   // Capitalise first letter
   return result.charAt(0).toUpperCase() + result.slice(1);
 }
